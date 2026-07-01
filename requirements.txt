@@ -1,0 +1,9 @@
+matplotlib
+numpy
+pandas
+scienceplots
+seaborn
+parityos
+parityos-qiskit
+qiskit-qasm3-import
+pylatexenc

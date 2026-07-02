@@ -49,10 +49,13 @@ def plot_circuit(df, id_number, qft_method):
 
 
 #analyses circuits one by one 
-def analyse_circuit_parameters(circuit: QuantumCircuit) -> dict:
+def analyse_circuit_parameters(qasm_string: str) -> dict:
     """
     Takes a Qiskit QuantumCircuit object and extracts metrics.
     """
+    # Convert the QASM string back into a QuantumCircuit object
+    circuit = loads(qasm_string)
+    
     # Get the dictionary of all gate counts (e.g., {'h': 3, 'cx': 2, 'rz': 4})
     gate_counts = dict(circuit.count_ops())
     

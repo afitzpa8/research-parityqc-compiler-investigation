@@ -7,3 +7,4 @@ parityos
 parityos-qiskit
 qiskit-qasm3-import
 pylatexenc
+qctrl-qcpa-ibm 

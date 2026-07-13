@@ -77,4 +77,37 @@ def analyse_circuit_parameters(qasm_string: str) -> dict:
     return analysis_metrics
 
 
+#collect sample collection of circuits for each qft method for analysis 
+def get_xth_circuits(df, qft_method_name: str, x: int) -> dict:
+    """
+    Filters the dataframe for a specific QFT method and returns a dictionary 
+    mapping each number_of_qubits to its X-th transpiled circuit.
+    
+    Parameters:
+    - df: The input pandas DataFrame.
+    - qft_method_name: The string name of the QFT method to filter by.
+    - x: The human-readable position of the circuit to extract (e.g., 10 for the 10th circuit).
+    """
+    # 1. Convert human position to Python 0-based index
+    target_index = x - 1
+    
+    # 2. Filter the DataFrame for the requested QFT method
+    filtered_df = df[df['qft_method'] == qft_method_name]
+    
+    if filtered_df.empty:
+        print(f"Error: No circuits found for QFT method '{qft_method_name}'.")
+        return {}
+        
+    circuits_dict = {}
+    
+    # 3. Group by the qubit size and pull the x-th circuit
+    for num_qubits, group in filtered_df.groupby('number_of_qubits'):
+        # Check if the group has enough rows to satisfy the requested position
+        if len(group) >= x:
+            # .iloc[target_index] grabs the exact requested positional row
+            circuits_dict[int(num_qubits)] = group.iloc[target_index]['transpiled_circuit']
+
+    
+    return circuits_dict
+
 

@@ -12,15 +12,21 @@ import matplotlib.pyplot as plt
 def get_circuit(df, id_number, qft_method):
     """
     Filters the dataframe by the QFT method first, 
-    then returns the n-th circuit within that filtered group.
+    then returns the n-th circuit within that filtered group 
+    as a parsed Qiskit QuantumCircuit object.
     """
     # Filter the dataframe for just this method
-    filtered_df = df[df['qft_method'] == qft_method]
-    
+    filtered_df = df[df["qft_method"] == qft_method]
+
     # Check if the filtered results have enough rows
     if id_number < len(filtered_df):
-        # .iloc gets the n-th row of the new, filtered dataframe
-        return filtered_df.iloc[id_number]['transpiled_circuit']
+        # 1. Extract the raw OpenQASM string from the dataframe
+        qasm_string = filtered_df.iloc[id_number]["transpiled_circuit"]
+
+        # 2. Convert the QASM string back into a real Qiskit QuantumCircuit object
+        circuit_object = loads(qasm_string)
+
+        return circuit_object
     
 
 
@@ -49,32 +55,65 @@ def plot_circuit(df, id_number, qft_method):
 
 
 #analyses circuits one by one 
-def analyse_circuit_parameters(qasm_string: str) -> dict:
+def analyse_circuit_parameters(circuit) -> dict:
     """
-    Takes a Qiskit QuantumCircuit object and extracts metrics.
+    Takes a Qiskit QuantumCircuit object
+    and extracts hardware metrics.
     """
-    # Convert the QASM string back into a QuantumCircuit object
-    circuit = loads(qasm_string)
-    
-    # Get the dictionary of all gate counts (e.g., {'h': 3, 'cx': 2, 'rz': 4})
+    # 1. Get the dictionary of all gate counts
     gate_counts = dict(circuit.count_ops())
     
-    # Count 2-qubit (non-local) gates specifically
-    # Transpiled circuits usually express these as 'cx', 'ecr', or 'cz'
+    # 2. Count 2-qubit (non-local) gates specifically
+    # Works natively in Qiskit 1.x/2.x environments
     two_qubit_gate_count = circuit.num_nonlocal_gates()
     
-    # Compile all analytical data into a clean dictionary
+    # 3. Calculate total size excluding structural barriers
+    # Barriers are not physical operations/gates
+    actual_total_gates = circuit.size()
+    if 'barrier' in gate_counts:
+        actual_total_gates -= gate_counts['barrier']
+        
+    # 4. Compile all analytical data into a clean dictionary
     analysis_metrics = {
         "num_qubits": circuit.num_qubits,
         "num_clbits": circuit.num_clbits,
         "circuit_depth": circuit.depth(),
-        "total_gate_count": circuit.size(),
+        "total_gate_count": actual_total_gates,
         "two_qubit_gate_count": two_qubit_gate_count,
-        "one_qubit_gate_count": circuit.size() - two_qubit_gate_count,
+        "one_qubit_gate_count": actual_total_gates - two_qubit_gate_count,
         "gate_breakdown": gate_counts
     }
     
     return analysis_metrics
+
+def get_circuit_metrics(circuit, backend=None, dt=None) -> dict:
+    """
+    Takes a Qiskit QuantumCircuit object, transpiles it for a target backend,
+    and returns a dictionary containing circuit depth, 2Q gate count, and duration.
+    """
+    # 3. Extract Circuit Depth
+    depth = circuit.depth()
+    
+    # 4. Extract Number of 2Q Gates
+    ops_count = circuit.count_ops()
+    # Safely look for common 2Q basis gates used by IBM hardware (ecr, cz, cx)
+    num_2q_gates = circuit.num_nonlocal_gates()  # This counts all non-local gates, which includes 2Q gates
+    num_2q_depth = circuit.depth(filter_function=lambda x: len(x.qubits) == 2)
+    # 4. Extract lowercase duration safely while ignoring the deprecation warning
+    #with warnings.catch_warnings():
+    #    warnings.filterwarnings("ignore", category=DeprecationWarning)
+        # We look for 'duration' in lowercase
+    #    raw_duration = getattr(circuit, 'duration', None)
+        
+    #if raw_duration is not None:
+    #    circuit_duration = raw_duration * dt * 1e6  # Convert to microseconds
+    #else:
+    #    circuit_duration = 0.0
+    return {
+        "depth": depth,
+        "num_2q_gates": num_2q_gates,
+        "num_2q_depth": num_2q_depth,
+    }
 
 
 #collect sample collection of circuits for each qft method for analysis 
@@ -105,8 +144,8 @@ def get_xth_circuits(df, qft_method_name: str, x: int) -> dict:
         # Check if the group has enough rows to satisfy the requested position
         if len(group) >= x:
             # .iloc[target_index] grabs the exact requested positional row
-            circuits_dict[int(num_qubits)] = group.iloc[target_index]['transpiled_circuit']
-
+            qasm_string = group.iloc[target_index]['transpiled_circuit']
+            circuits_dict[int(num_qubits)] = loads(qasm_string)
     
     return circuits_dict
 
